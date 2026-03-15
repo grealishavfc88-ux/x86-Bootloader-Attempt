@@ -1,37 +1,45 @@
-[ORG 0x7c00] ; <-- The assembler will make this code load at this specified physical address 
-[BITS 16] ; Specify assembler to assemble for 16-bit (real mode)
+[ORG 0x7C00] ; <-- 0x7C00 (0000:7C00) is the address, in which BIOS loads the first sector of a bootable disk.
+[BITS 16] ; <-- Tell assembler we will be using 16-bit instructions & data.
 
-start:
+START:
 
-	cli ; Set IF to 0 (false)
-	cld ; Set DF to 0 (false)
-	xor ax, ax ; Clear ax
-	mov ds, ax ; Clear ds
-	mov es, ax ; Clear es
-	mov fs, ax ; Clear fs (optional)
-	mov gs, ax ; Clear gs (optional)
-	mov ss, ax ; Clear ss
-	mov sp, 0x7c00 ; <-- Stack grows down from here 
-	sti ; Set IF to 1 (true)
+        CLI ; <-- Clear IF
+        CLD ; <-- Clear DF
 
-	mov si, msg ; Load msg address into si
-	xor bh, bh ; Clear bh 
-	mov ah, 0x0e ; Select teletype output
+        XOR AX, AX
+        MOV DS, AX
+        MOV ES, AX
+        MOV FS, AX ; <-- Optional
+        MOV GS, AX ; <-- Optional
+        MOV SS, AX
+        MOV SP, 0x8400 ; <-- Stack grows downwards from here.
 
-output:
+        STI ; <-- Set IF
 
-	lodsb ; Load string byte at DS:SI to AL and increment SI
-	test al, al ; Use bitwise to check if al is 0 (end of string)
-	je finish ; Jump to finish if AL = 0
-	int 0x10 ; Call BIOS video services
-	jmp output ; Jump to output
+        MOV AX, 0x03 ; <-- Set text mode
+        INT 0x10 ; <-- Call BIOS
 
-finish:
+        MOV AX, 0xB800 ; <-- Copy start value of VGA text mode memory into AX
+        MOV ES, AX ; <-- ES = 0xB800
+        XOR DI, DI ; <-- DI = 0
 
-	hlt ; Halt until the next interrupt
-	jmp finish ; Jump to finish (stop)
+        MOV SI, MSG ; <-- Copy address of MSG into SI
 
-	msg: db 'Boot successful!' , 13, 10, 0 ; Define msg, with a newline
+OUTPUT_LOOP:
 
-times 510 - ($-$$) db 0 ; Pad boot sector
-dw 0xAA55 ; Define final two bytes: (55 , AA) (boot signature)
+        LODSB
+        TEST AL, AL
+        JZ FINISH
+        MOV AH, 0xCF ; <-- WHITE ON RED
+        STOSW
+        JMP OUTPUT_LOOP
+
+FINISH:
+
+        HLT
+        JMP FINISH
+
+        MSG DB 'BOOT SUCCESSFUL!',0 ; <-- Define MSG
+
+TIMES 510 - ($-$$) DB 0 ; <-- Boot sector padding
+DW 0xAA55 ; <-- Define 16-bit value (boot signature)
