@@ -1,36 +1,43 @@
-[ORG 0x7C00] ; <-- 0x7C00 (0000:7C00) is the address, in which BIOS loads the first sector of a bootable disk.
-[BITS 16] ; <-- Tell assembler we will be using 16-bit instructions & data.
+[ORG 0]
+
+BOOTSEG EQU 0x07C0 ; This is the segment we use to boot, it's where BIOS loads our bootloader.asm
+INITSEG EQU 0x9000 ; We use this to move out of the way before anything serious
+VGA_ATTR EQU 0x0F ; Attribute byte for VGA printing
+STACK_PTR EQU 0x8400 ; This is our stack pointer value
+VGASEG EQU 0xB800 ; This is our VGA text mode segment
 
 START:
 
-        CLI ; <-- Clear IF
-        CLD ; <-- Clear DF
+        CLI ; Disable interrupts
+        CLD ; Confirm the direction flag is cleared
 
-        XOR AX, AX
+        MOV AX, BOOTSEG
         MOV DS, AX
         MOV ES, AX
-        MOV FS, AX ; <-- Optional
-        MOV GS, AX ; <-- Optional
+
+        XOR AX, AX
+        MOV FS, AX
+        MOV GS, AX
+
+        MOV AX, INITSEG
         MOV SS, AX
-        MOV SP, 0x8400 ; <-- Stack grows downwards from here.
+        MOV SP, STACK_PTR
 
-        STI ; <-- Set IF
+        MOV AX, 0x03
+        INT 0x10
 
-        MOV AX, 0x03 ; <-- Set text mode
-        INT 0x10 ; <-- Call BIOS
+        MOV AX, VGASEG
+        MOV ES, AX
+        XOR DI, DI
 
-        MOV AX, 0xB800 ; <-- Copy start value of VGA text mode memory into AX
-        MOV ES, AX ; <-- ES = 0xB800
-        XOR DI, DI ; <-- DI = 0
-
-        MOV SI, MSG ; <-- Copy address of MSG into SI
+        MOV SI, MSG
 
 OUTPUT_LOOP:
 
         LODSB
-        TEST AL, AL
+        OR AL, AL
         JZ FINISH
-        MOV AH, 0xCF ; <-- WHITE ON RED
+        MOV AH, VGA_ATTR
         STOSW
         JMP OUTPUT_LOOP
 
@@ -39,7 +46,7 @@ FINISH:
         HLT
         JMP FINISH
 
-        MSG DB 'BOOT SUCCESSFUL!',0 ; <-- Define MSG
+        MSG DB 'BOOT SUCCESSFUL!',0 ; <-- Message to print
 
-TIMES 510 - ($-$$) DB 0 ; <-- Boot sector padding
-DW 0xAA55 ; <-- Define 16-bit value (boot signature)
+TIMES 510 - ($-$$) DB 0 ; Bootloader padding
+DW 0xAA55 ; Boot signature ( 55, AA )
